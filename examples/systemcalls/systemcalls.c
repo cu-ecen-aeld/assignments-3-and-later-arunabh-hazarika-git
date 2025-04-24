@@ -1,4 +1,12 @@
+#include <errno.h>
+#include <string.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/wait.h>
 #include "systemcalls.h"
+
+
 
 /**
  * @param cmd the command to execute with system()
@@ -7,8 +15,7 @@
  *   either in invocation of the system() call, or if a non-zero return
  *   value was returned by the command issued in @param cmd.
 */
-bool do_system(const char *cmd)
-{
+bool do_system(const char *cmd) {
 
 /*
  * TODO  add your code here
@@ -16,8 +23,8 @@ bool do_system(const char *cmd)
  *   and return a boolean true if the system() call completed with success
  *   or false() if it returned a failure
 */
-
-    return true;
+  int status = system(cmd);
+  return (status != -1);
 }
 
 /**
@@ -34,20 +41,45 @@ bool do_system(const char *cmd)
 *   by the command issued in @param arguments with the specified arguments.
 */
 
+// Abstract out the fork, execv, wait steps
+bool run_child(char* cmd, char** arguments, int count) {
+  fflush(stdout);
+  pid_t fpid = fork();
+  if (fpid == -1) {
+    perror("Fork error");
+    return false;      
+  }
+  int retval = execv(cmd, arguments);
+  if (retval == -1) {
+    perror("Exec error");
+    return false;
+  }
+  int wstatus = 0;
+  pid_t wpid = wait(&wstatus);
+  if (wpid == -1) {
+    perror("Wait error");
+    return false;      
+  } else if (!WIFEXITED(wstatus)) {
+    fprintf(stderr, "Child terminated abnormally with status %d\n", WEXITSTATUS(wstatus));
+    return false;
+  }
+  return true;
+}
+
 bool do_exec(int count, ...)
 {
-    va_list args;
-    va_start(args, count);
-    char * command[count+1];
-    int i;
-    for(i=0; i<count; i++)
-    {
-        command[i] = va_arg(args, char *);
-    }
-    command[count] = NULL;
-    // this line is to avoid a compile warning before your implementation is complete
-    // and may be removed
-    command[count] = command[count];
+  va_list args;
+  va_start(args, count);
+  char * command[count+1];
+  int i;
+  for(i=0; i<count; i++)
+  {
+    command[i] = va_arg(args, char *);
+  }
+  command[count] = NULL;
+  // this line is to avoid a compile warning before your implementation is complete
+  // and may be removed
+  //command[count] = command[count];
 
 /*
  * TODO:
@@ -58,10 +90,9 @@ bool do_exec(int count, ...)
  *   as second argument to the execv() command.
  *
 */
-
-    va_end(args);
-
-    return true;
+  bool r = run_child(command[0], command, count);
+  va_end(args);
+  return r;
 }
 
 /**
@@ -71,18 +102,17 @@ bool do_exec(int count, ...)
 */
 bool do_exec_redirect(const char *outputfile, int count, ...)
 {
-    va_list args;
-    va_start(args, count);
-    char * command[count+1];
-    int i;
-    for(i=0; i<count; i++)
-    {
-        command[i] = va_arg(args, char *);
-    }
-    command[count] = NULL;
-    // this line is to avoid a compile warning before your implementation is complete
-    // and may be removed
-    command[count] = command[count];
+  va_list args;
+  va_start(args, count);
+  char * command[count+1];
+  int i;
+  for(i=0; i<count; i++) {
+    command[i] = va_arg(args, char *);
+  }
+  command[count] = NULL;
+  // this line is to avoid a compile warning before your implementation is complete
+  // and may be removed
+  // command[count] = command[count];
 
 
 /*
@@ -92,8 +122,21 @@ bool do_exec_redirect(const char *outputfile, int count, ...)
  *   The rest of the behaviour is same as do_exec()
  *
 */
+  int fd = open(outputfile, O_CREAT|O_WRONLY|O_TRUNC, S_IWUSR|S_IRUSR|S_IRGRP|S_IROTH);
+  if (fd == -1) {
+    perror("Output file open error");
+    return false;
+  }
+  if (dup2(fd, STDOUT_FILENO) == -1) {
+    perror("Output file stdout bind error");
+    return false;    
+  }
+  if (close(fd) != 0) {
+    perror("Output file close error");
+    return false;    
+  }
+  bool r = run_child(command[0], command, count);
+  va_end(args);
 
-    va_end(args);
-
-    return true;
+  return r;
 }
