@@ -11,9 +11,9 @@ KERNEL_VERSION=v5.15.163
 BUSYBOX_VERSION=1_33_1
 FINDER_APP_DIR=$(realpath $(dirname $0))
 ARCH=arm64
+TOOLCHAIN_ROOT=~/arm-gnu-toolchain-13.3.rel1-x86_64-aarch64-none-linux-gnu
 CROSS_COMPILE=aarch64-none-linux-gnu-
-TOOLCHAIN_ROOT=~/arunabh/arm-gnu-toolchain-13.3.rel1-x86_64-aarch64-none-linux-gnu
-CURRDIR=`pwd`
+
 
 if [ $# -lt 1 ]
 then
@@ -51,13 +51,13 @@ if [ ! -e ${OUTDIR}/linux-stable/arch/${ARCH}/boot/Image ]; then
     # NOTE: Assumes that the build toolchain for the CROSS_COMPILE arch
     # is in PATH; ARCH and CROSS_COMPILE already defined above
     # Clean out previous build
-    make mrproper
+    make ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE} mrproper
     if [ $? -ne 0 ] ; then
 	echo "Clean failed"
 	exit 1
     fi
     # Set up default config
-    make defconfig   
+    make ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE} defconfig   
     if [ $? -ne 0 ] ; then
 	echo "Build config failed"
 	exit 1
@@ -68,32 +68,34 @@ if [ ! -e ${OUTDIR}/linux-stable/arch/${ARCH}/boot/Image ]; then
     # if [ -f ".config" ]; then
     #   cp .config ../bkp.build.config
     # fi
-    # make menuconfig
+    # make ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE} menuconfig
 
     # Build
-    make all
+    make -j4 ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE} all
     if [ $? -ne 0 ] ; then
-	echo "Build all failed"
-	exit 1
+      echo "Build all failed"
+      exit 1
     fi
-
-    # Skip modules
-    #make modules
+    
+    # Skip modules - requires starting the emulator with >512MB memory
+    # make ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE} modules
     # if [ $? -ne 0 ] ; then
     #	echo "Build modules failed"
     #	exit 1
     # fi
 
-    # Device tree
-    make dtbs
+    # Device tree - should not make all build the dtbs target as well?
+    # But no matter - the call is short-circuited if it is
+    make ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE} dtbs
     if [ $? -ne 0 ] ; then
-	echo "Build dtbs failed"
-	exit 1
+      echo "Build dtbs failed"
+      exit 1
     fi
+
+    echo "Adding the Image in outdir"
+    cp ${OUTDIR}/linux-stable/arch/${ARCH}/boot/Image ${OUTDIR}/
 fi
 
-echo "Adding the Image in outdir"
-cp ${OUTDIR}/linux-stable/arch/${ARCH}/boot/Image ${OUTDIR}
 
 
 echo "Creating the staging directory for the root filesystem"
@@ -105,7 +107,7 @@ then
 fi
 # TODO: Create necessary base directories
 mkdir ${OUTDIR}/rootfs && cd ${OUTDIR}/rootfs
-mkdir bin dev etc home lib lib64 proc sbin sys tmp var
+mkdir bin dev etc home lib lib64 proc sbin sys tmp usr var
 mkdir usr/bin usr/lib usr/sbin
 mkdir var/log
 
@@ -116,15 +118,17 @@ then
     cd busybox
     git checkout ${BUSYBOX_VERSION}
     # TODO:  Configure busybox
-    make distclean
-    make defconfig
+    make ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE} distclean
+    make ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE} defconfig
 else
     cd busybox
 fi
 
 # TODO: Make and install busybox
-make
-make CONFIG_PREFIX="${OUTDIR}/rootfs" install
+make ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE}
+make ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE} CONFIG_PREFIX="${OUTDIR}/rootfs" install
+
+cd ${OUTDIR}/rootfs
 
 echo "Library dependencies"
 ${CROSS_COMPILE}readelf -a bin/busybox | grep "program interpreter"
@@ -141,9 +145,9 @@ sudo mknod -m 666 dev/null c 1 3
 sudo mknod -m 666 dev/console c 5 1
 
 # TODO: Clean and build the writer utility
-cd "$CURRDIR"
-make clean
-make
+cd "$FINDER_APP_DIR"
+make ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE} clean
+make ARCH=${ARCH} CROSS_COMPILE=${CROSS_COMPILE}
 
 # TODO: Copy the finder related scripts and executables to the /home directory
 # on the target rootfs
@@ -163,4 +167,4 @@ sudo chown root:root ${OUTDIR}/rootfs
 cd "$OUTDIR/rootfs"
 find . | cpio -H newc -ov --owner root:root > ${OUTDIR}/initramfs.cpio
 gzip -f ${OUTDIR}/initramfs.cpio
-cd "$CURRDIR" # switch back to original directory
+
