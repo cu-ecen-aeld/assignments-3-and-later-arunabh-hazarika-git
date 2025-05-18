@@ -1,4 +1,4 @@
-CROSS_COMPILE=aarch64-none-linux-gnu-
+#CROSS_COMPILE=aarch64-none-linux-gnu-
 CFLAGS=-Wall -Werror -pedantic -std=gnu99
 CC=$(CROSS_COMPILE)gcc
 
