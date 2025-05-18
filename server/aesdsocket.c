@@ -1,9 +1,8 @@
-/* Server-side code to listen at a port, which defaults to 9000
- * but may be overridden on the command line, accept and read
+/* Server-side code to listen at port 9000, accept and read
  * messages from a client - each message terminated by '\n' -
  * and appends the output to a file specified by the macro
  * MESSAGES_FILE. The client is expected to terminate its message
- * with a '\n' and the  wait for a response. Returns the entire
+ * with a '\n' and then wait for a response. Returns the entire
  * contents of MESSAGES_FILE in response to the client. Supports
  * both IPv4 and IPv6 via the SOCK_FAMILY macro. Runs in daemon
  * mode if the command line argument '-d' is specified. In that
@@ -25,7 +24,7 @@
 #include <sys/socket.h>
 #include <unistd.h>
 
-
+#define PORT 9000
 #define ACCEPT_BACK_LOG 10
 #define MESSAGES_FILE "/var/tmp/aesdsocketdata"
 #define BUFF_SZ 64
@@ -179,6 +178,7 @@ void dispatch(int sockfd) {
 }
 
 
+
 // Handles communication with a client - reading the data
 // sent from the client and sending the response. The
 // response is sent only if the data from the client is
@@ -206,17 +206,10 @@ void converse(int sockfd) {
 }
 
 
-int main(int argc, char** argv) {
-  openlog(argv[0], LOG_CONS, LOG_USER);
-  uint32_t port = 9000;
-  if (argc == 2) {
-    int p = atoi(argv[1]);
-    if (p != 0) port = p;
-    else {
-      fprintf(stderr, "Ignoring invalid port value: %s\n", argv[1]);
-      syslog(LOG_WARNING, "Ignoring invalid port value: %s\n", argv[1]); 
-    }
-  }
+
+void init_server(char* appname) {
+  openlog(appname, LOG_CONS, LOG_USER);
+
   int sockfd = socket(SOCK_FAMILY, SOCK_STREAM, 0);
   if (sockfd == -1) {
     exit_on_failure("Server socket create failed", errno, -1);
@@ -237,15 +230,17 @@ int main(int argc, char** argv) {
     exit_on_failure("IP address init failed", errno, sockfd);
   }
   struct sockaddr_in sa = {
-    .sin_family=SOCK_FAMILY, .sin_port=htons(port), .sin_addr=ip_addr
+    .sin_family=SOCK_FAMILY, .sin_port=htons(PORT), .sin_addr=ip_addr
   };
   if (bind(sockfd, (struct sockaddr*)&sa, sizeof(sa)) != 0) {
     exit_on_failure("Server socket bind failed", errno, sockfd);
   }
 
   // Listen
-  fprintf(stdout, "Listening at localhost:%d\n", port);
-  syslog(LOG_INFO, "Listening at localhost:%d\n", port);
+  if (is_daemon == false) {
+    fprintf(stdout, "Listening at localhost:%d\n", PORT);
+  }
+  syslog(LOG_INFO, "Listening at localhost:%d\n", PORT);
   if (listen(sockfd, ACCEPT_BACK_LOG) != 0) {
     exit_on_failure("Server socket listen failed", errno, sockfd);
   }
@@ -274,6 +269,27 @@ int main(int argc, char** argv) {
   // Delete file
   if (remove(MESSAGES_FILE) != 0) {
     handle_error("Could not delete out file", errno);
+  }
+  closelog();
+}
+
+
+int main(int argc, char** argv) {
+  if (argc == 2 && strcmp(argv[1], "-d") == 0) is_daemon = true;      
+
+  if (is_daemon == true) {
+    pid_t cpid = fork();
+    if (cpid == -1) {
+      handle_error("Failed to create child process", errno);
+      return EXIT_FAILURE;
+    }
+    if (cpid == 0) {
+      init_server(argv[0]);
+    } else {
+      printf("Created server process with pid %d\n", cpid);
+    }
+  } else {
+    init_server(argv[0]);
   }
   return EXIT_SUCCESS;
 }
