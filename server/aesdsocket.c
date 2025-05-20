@@ -184,6 +184,7 @@ void dispatch(int sockfd) {
 // response is sent only if the data from the client is
 // read successfully
 void converse(int sockfd) {
+  syslog(LOG_INFO, "Client connected");
   size_t addr_len = (SOCK_FAMILY == AF_INET ?
 		     INET_ADDRSTRLEN : INET6_ADDRSTRLEN);
   char client_ip[addr_len+1];
