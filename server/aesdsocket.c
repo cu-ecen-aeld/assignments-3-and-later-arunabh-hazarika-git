@@ -224,7 +224,9 @@ void init_server(char* appname) {
 
   // Bind to localhost:<port>
   struct in_addr ip_addr;
-  if (inet_pton(SOCK_FAMILY, INADDR_ANY, &ip_addr) <= 0) {
+  if (inet_pton(SOCK_FAMILY,
+		SOCK_FAMILY == AF_INET ? "127.0.0.1" : "::1",
+		&ip_addr) <= 0) {
     exit_on_failure("IP address init failed", errno, sockfd);
   }
   struct sockaddr_in sa = {
