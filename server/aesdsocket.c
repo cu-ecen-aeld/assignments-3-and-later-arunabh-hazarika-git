@@ -184,7 +184,6 @@ void dispatch(int sockfd) {
 // response is sent only if the data from the client is
 // read successfully
 void converse(int sockfd) {
-  syslog(LOG_INFO, "Client connected");
   size_t addr_len = (SOCK_FAMILY == AF_INET ?
 		     INET_ADDRSTRLEN : INET6_ADDRSTRLEN);
   char client_ip[addr_len+1];
@@ -255,15 +254,12 @@ void init_server(char* appname) {
 
   // Wait for connection
   while (terminate == false) {
-    syslog(LOG_INFO, "Waiting for messages");
     struct sockaddr ca;
     socklen_t sz = sizeof(ca);
     int psockfd = accept(sockfd, &ca, &sz);
     if (psockfd == -1) {
       if (terminate == false) {
 	handle_error("Failed to accept client connection", errno);
-      } else {
-	syslog(LOG_INFO, "Server process terminated");
       }
     } else converse(psockfd);
   }
