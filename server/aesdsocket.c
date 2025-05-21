@@ -28,7 +28,7 @@
 #define ACCEPT_BACK_LOG 10
 #define MESSAGES_FILE "/var/tmp/aesdsocketdata"
 #define BUFF_SZ 64
-#define SOCK_FAMILY AF_INET // Either AF_INET or AF_INET6
+#define SOCK_FAMILY AF_INET6 // Either AF_INET or AF_INET6
 
 
 bool is_daemon = false;
