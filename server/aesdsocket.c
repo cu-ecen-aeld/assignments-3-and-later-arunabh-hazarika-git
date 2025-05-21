@@ -3,9 +3,8 @@
  * and appends the output to a file specified by the macro
  * MESSAGES_FILE. The client is expected to terminate its message
  * with a '\n' and then wait for a response. Returns the entire
- * contents of MESSAGES_FILE in response to the client. Supports
- * both IPv4 and IPv6 via the SOCK_FAMILY macro. Runs in daemon
- * mode if the command line argument '-d' is specified. In that
+ * contents of MESSAGES_FILE in response to the client. Runs as
+ * a daemon if the command line argument '-d' is specified. In that
  * mode, no output is made to stdout or stderr. All messages are
  * syslog'ed to /var/log/syslog, tagged by the program executable
  * name.
@@ -28,8 +27,6 @@
 #define ACCEPT_BACK_LOG 10
 #define MESSAGES_FILE "/var/tmp/aesdsocketdata"
 #define BUFF_SZ 64
-#define SOCK_FAMILY AF_INET6 // Either AF_INET or AF_INET6
-
 
 bool is_daemon = false;
 bool terminate = false;
@@ -101,7 +98,7 @@ bool get_client_ip(int sockfd, char* client_ip, size_t len) {
     handle_error("Failed to get peer info", errno);
     return false;
   }
-  inet_ntop(SOCK_FAMILY, &(sa.sin_addr), client_ip, len);
+  inet_ntop(AF_INET, &(sa.sin_addr), client_ip, len);
   return true;
 }
 
@@ -184,11 +181,9 @@ void dispatch(int sockfd) {
 // response is sent only if the data from the client is
 // read successfully
 void converse(int sockfd) {
-  size_t addr_len = (SOCK_FAMILY == AF_INET ?
-		     INET_ADDRSTRLEN : INET6_ADDRSTRLEN);
-  char client_ip[addr_len+1];
-  client_ip[addr_len] = '\0'; // Ensure NULL-terminated
-  if (get_client_ip(sockfd, client_ip, addr_len)) {
+  char client_ip[INET_ADDRSTRLEN+1];
+  client_ip[INET_ADDRSTRLEN] = '\0'; // Ensure NULL-terminated
+  if (get_client_ip(sockfd, client_ip, INET_ADDRSTRLEN)) {
     // Log connection accept
     if (is_daemon == false) {
       fprintf(stdout, "Accepted connection from %s\n", client_ip);
@@ -210,29 +205,20 @@ void converse(int sockfd) {
 void init_server(char* appname) {
   openlog(appname, LOG_CONS, LOG_USER);
 
-  int sockfd = socket(SOCK_FAMILY, SOCK_STREAM, 0);
+  int sockfd = socket(AF_INET, SOCK_STREAM, 0);
   if (sockfd == -1) {
     exit_on_failure("Server socket create failed", errno, -1);
   }
 
-  // Set socket options (at socket level, hence SOL_SOCKET, not SOCK_FAMILY)
+  // Set socket options (at socket level, hence SOL_SOCKET, not AF_INET)
   int enable=1;
   if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR,
 		 &enable, sizeof(enable)) != 0) {
     exit_on_failure("Socket option setting failed", errno, sockfd);
   }
 
-  // Bind to <any>:<port>
-  /*
-  struct in_addr ip_addr;
-  if (inet_pton(SOCK_FAMILY,
-		SOCK_FAMILY == AF_INET ? "127.0.0.1" : "::1",
-		&ip_addr) <= 0) {
-    exit_on_failure("IP address init failed", errno, sockfd);
-  }
-  */
   struct sockaddr_in sa = {
-    .sin_family=SOCK_FAMILY, .sin_port=htons(PORT), .sin_addr=INADDR_ANY 
+      .sin_family=AF_INET, .sin_port=htons(PORT), .sin_addr=INADDR_ANY 
   };
   if (bind(sockfd, (struct sockaddr*)&sa, sizeof(sa)) != 0) {
     exit_on_failure("Server socket bind failed", errno, sockfd);
