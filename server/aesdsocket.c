@@ -222,15 +222,17 @@ void init_server(char* appname) {
     exit_on_failure("Socket option setting failed", errno, sockfd);
   }
 
-  // Bind to localhost:<port>
+  // Bind to <any>:<port>
+  /*
   struct in_addr ip_addr;
   if (inet_pton(SOCK_FAMILY,
 		SOCK_FAMILY == AF_INET ? "127.0.0.1" : "::1",
 		&ip_addr) <= 0) {
     exit_on_failure("IP address init failed", errno, sockfd);
   }
+  */
   struct sockaddr_in sa = {
-    .sin_family=SOCK_FAMILY, .sin_port=htons(PORT), .sin_addr=ip_addr
+    .sin_family=SOCK_FAMILY, .sin_port=htons(PORT), .sin_addr=INADDR_ANY 
   };
   if (bind(sockfd, (struct sockaddr*)&sa, sizeof(sa)) != 0) {
     exit_on_failure("Server socket bind failed", errno, sockfd);
