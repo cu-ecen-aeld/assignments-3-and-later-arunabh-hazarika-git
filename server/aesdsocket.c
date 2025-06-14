@@ -238,7 +238,6 @@ void* converse(void* args) {
   if (receive(params->sockfd, params->file) == true) {
     dispatch(params->sockfd, params->file); // This releases the file lock
   } else { // Release the file lock
-    printf("Receive returned false\n");
     int unlock_status = pthread_mutex_unlock(params->file->lock);
     if (unlock_status != 0) { // Considered non-fatal?
       handle_error("Failed to release outfile lock", 0);
@@ -300,8 +299,7 @@ void init_server(char* appname) {
 
   // Set socket options (at socket level, hence SOL_SOCKET, not AF_INET)
   int enable=1;
-  if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR,
-		 &enable, sizeof(enable)) != 0) {
+  if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &enable, sizeof(enable)) != 0) {
     exit_on_failure("Socket option setting failed", errno, sockfd, -1);
   }
 
@@ -329,7 +327,7 @@ void init_server(char* appname) {
   }
 
   // Open outfile
-  int ofd = open(MESSAGES_FILE, O_CREAT|O_RDWR|O_SYNC, S_IRWXU|S_IRGRP|S_IROTH);
+  int ofd = open(MESSAGES_FILE, O_CREAT|O_RDWR|O_TRUNC|O_SYNC, S_IRWXU|S_IRGRP|S_IROTH);
   if (ofd == -1) {
     exit_on_failure("Could not open outfile", errno, sockfd, -1);
   }
@@ -378,6 +376,8 @@ void init_server(char* appname) {
   }
   if (is_daemon == false) fprintf(stdout, "Caught signal, exiting\n");
   syslog(LOG_INFO, "Caught signal, exiting\n");
+  // Close server socket
+  sock_close(sockfd);
   // Join all threads and free workers node
   for (workers_t* w=head; w != NULL;) {
     if (pthread_join(*(w->thread), NULL) != 0) {
@@ -392,8 +392,6 @@ void init_server(char* appname) {
   if (pthread_join(time_stamper, NULL) != 0) {
     handle_error("Failed to join time-stamper thread", errno);
   }
-  // Close server socket
-  sock_close(sockfd);
   // Close file
   file_close(ofd);
   // Delete file
@@ -413,7 +411,7 @@ int main(int argc, char** argv) {
       handle_error("Failed to create child process", errno);
       return EXIT_FAILURE;
     }
-    if (cpid == 0) {
+    if (cpid == 0) { // Is child process
       init_server(argv[0]);
     } else {
       printf("Created server process with pid %d\n", cpid);
