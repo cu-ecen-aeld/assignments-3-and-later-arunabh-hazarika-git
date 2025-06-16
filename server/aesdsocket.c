@@ -285,6 +285,7 @@ void* write_timestamp(void* args) {
       handle_error("Failed to acquire outfile lock", 0);
     }
   }
+  return NULL;
 }
 
 
@@ -304,7 +305,7 @@ void init_server(char* appname) {
   }
 
   struct sockaddr_in sa = {
-      .sin_family=AF_INET, .sin_port=htons(PORT), .sin_addr=INADDR_ANY 
+    .sin_family=AF_INET, .sin_port=htons(PORT), .sin_addr= { INADDR_ANY }
   };
   if (bind(sockfd, (struct sockaddr*)&sa, sizeof(sa)) != 0) {
     exit_on_failure("Server socket bind failed", errno, sockfd, -1);

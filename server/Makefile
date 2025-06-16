@@ -1,14 +1,16 @@
 # Read from environment
-#CROSS_COMPILE=aarch64-none-linux-gnu-
-#CFLAGS=-Wall -Werror -pedantic -std=gnu99
-#CC=$(CROSS_COMPILE)gcc
+CROSS_COMPILE ?= aarch64-none-linux-gnu-
+CFLAGS ?= -Wall -Werror
+CC ?= $(CROSS_COMPILE)gcc
+TARGET ?= aesdsocket 
+LDFLAGS ?= -lpthread -lrt
 
 default: all
 
 all: clean aesdsocket
 
-writer: aesdsocket.c
-	$(CC) $(CFLAGS) -o aesdsocket aesdsocket.c
+aesdsocket: aesdsocket.c
+	$(CC) $(CFLAGS) -o aesdsocket aesdsocket.c $(LDFLAGS)
 
 clean:
 	rm -f aesdsocket.o aesdsocket *~
